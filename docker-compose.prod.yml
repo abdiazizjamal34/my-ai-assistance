@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      target: production
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+      DEFAULT_USER_ID: ${DEFAULT_USER_ID:?DEFAULT_USER_ID is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      AI_PROVIDER: ${AI_PROVIDER:-openai}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
+      AI_TIMEOUT_MS: ${AI_TIMEOUT_MS:-30000}
+      MEMORY_ENABLED: ${MEMORY_ENABLED:-true}
+      MEMORY_RETRIEVAL_ENABLED: ${MEMORY_RETRIEVAL_ENABLED:-true}
+      MEMORY_MAX_ITEMS: ${MEMORY_MAX_ITEMS:-8}
+      MEMORY_MIN_SCORE: ${MEMORY_MIN_SCORE:-0.65}
+      MEMORY_MAX_CONTEXT_TOKENS: ${MEMORY_MAX_CONTEXT_TOKENS:-1500}
+      MEMORY_AUTO_SAVE_ENABLED: ${MEMORY_AUTO_SAVE_ENABLED:-true}
+      MEMORY_CONFIRMATION_ENABLED: ${MEMORY_CONFIRMATION_ENABLED:-true}
+      BODY_LIMIT: ${BODY_LIMIT:-100kb}
+      AGENT_RATE_LIMIT_PER_MINUTE: ${AGENT_RATE_LIMIT_PER_MINUTE:-20}
+      CORS_ORIGINS: ${CORS_ORIGINS:?CORS_ORIGINS is required}
+    ports:
+      - "${BACKEND_BIND_ADDRESS:-127.0.0.1}:${BACKEND_PORT:-4000}:4000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend-migrate:
+    profiles: ["migrate"]
+    build:
+      context: ./backend
+      target: build
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:?POSTGRES_USER is required}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+    command: ["npx", "prisma", "migrate", "deploy"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

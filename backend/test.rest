@@ -1,0 +1,241 @@
+### Variables
+@host = http://localhost:4000
+@userId = 00000000-0000-4000-8000-000000000001
+@contentType = application/json
+# Paste a conversation id returned from the "Create conversation" request below.
+@conversationId = REPLACE_ME
+
+### Health check
+GET {{host}}/health
+
+### Get profile (uses DEFAULT_USER_ID fallback, or the header)
+GET {{host}}/api/profile
+x-user-id: {{userId}}
+
+### Get preferences
+GET {{host}}/api/preferences
+x-user-id: {{userId}}
+
+### Get assistant profile
+GET {{host}}/api/assistant-profile
+x-user-id: {{userId}}
+
+### --- Agent ---
+
+### Chat: simple hello (creates a NEW conversation each time)
+# @name helloChat
+POST {{host}}/api/agent/chat
+Content-Type: {{contentType}}
+x-user-id: {{userId}}
+
+{
+  "message": "Hello"
+}
+
+### Chat: create a task (exercises tool calling)
+POST {{host}}/api/agent/chat
+Content-Type: {{contentType}}
+x-user-id: {{userId}}
+
+{
+  "message": "Create a task called Review the sprint plan"
+}
+
+### Chat: list tasks via chat
+POST {{host}}/api/agent/chat
+Content-Type: {{contentType}}
+x-user-id: {{userId}}
+
+{
+  "message": "What are my tasks for today?"
+}
+
+### Chat: remember a preference (exercises memory save)
+POST {{host}}/api/agent/chat
+Content-Type: {{contentType}}
+x-user-id: {{userId}}
+
+{
+  "message": "Remember that I prefer concise answers."
+}
+
+### Chat: inspect memories conversationally
+POST {{host}}/api/agent/chat
+Content-Type: {{contentType}}
+x-user-id: {{userId}}
+
+{
+  "message": "What do you remember about me?"
+}
+
+### Chat: uncertain memory (should return a candidate, not save)
+POST {{host}}/api/agent/chat
+Content-Type: {{contentType}}
+x-user-id: {{userId}}
+
+{
+  "message": "I might start learning Rust next month."
+}
+
+### Chat: reuse conversation (uses @conversationId from variables)
+POST {{host}}/api/agent/chat
+Content-Type: {{contentType}}
+x-user-id: {{userId}}
+
+{
+  "message": "What did I just tell you?",
+  "conversationId": "{{conversationId}}"
+}
+
+### --- Direct resource endpoints ---
+
+### List tasks
+GET {{host}}/api/tasks
+x-user-id: {{userId}}
+
+### List today's tasks
+GET {{host}}/api/tasks?date=today
+x-user-id: {{userId}}
+
+### List memories
+GET {{host}}/api/memories
+x-user-id: {{userId}}
+
+### Search memories
+GET {{host}}/api/memories/search?q=concise
+x-user-id: {{userId}}
+
+### List goals
+GET {{host}}/api/goals
+x-user-id: {{userId}}
+
+### List reminders
+GET {{host}}/api/reminders
+x-user-id: {{userId}}
+
+### Create a goal directly
+POST {{host}}/api/goals
+Content-Type: {{contentType}}
+x-user-id: {{userId}}
+
+{
+  "title": "Ship the backend hardening",
+  "description": "Land async error handling, rate limiting, and conversations.",
+  "category": "CAREER",
+  "priority": "HIGH",
+  "status": "ACTIVE"
+}
+
+### Create a reminder directly
+POST {{host}}/api/reminders
+Content-Type: {{contentType}}
+x-user-id: {{userId}}
+
+{
+  "title": "Review the sprint plan",
+  "remindAt": "2026-10-09T09:00:00.000Z"
+}
+
+### --- Error cases ---
+
+### Malformed JSON body (should return 400 MALFORMED_JSON)
+POST {{host}}/api/agent/chat
+Content-Type: {{contentType}}
+x-user-id: {{userId}}
+
+{not json
+
+### Missing required field (should return 400)
+POST {{host}}/api/agent/chat
+Content-Type: {{contentType}}
+x-user-id: {{userId}}
+
+{}
+
+### Invalid user id header (should return 400)
+GET {{host}}/api/profile
+x-user-id: not-a-uuid
+
+### Unknown route (should return 404 NOT_FOUND)
+GET {{host}}/api/nonexistent
+x-user-id: {{userId}}
+
+
+### Chat with DeepSeek
+POST http://localhost:4000/api/agent/chat
+Content-Type: application/json
+x-user-id: 00000000-0000-4000-8000-000000000001
+
+{
+  "message": "What do you remember about me?"
+}
+
+### List tasks
+GET http://localhost:4000/api/tasks
+x-user-id: 00000000-0000-4000-8000-000000000001
+####
+
+POST http://localhost:4000/api/agent/chat
+Content-Type: application/json
+x-user-id: 00000000-0000-4000-8000-000000000001
+
+{
+  "message": "hi"
+}
+
+
+#####
+GET http://localhost:4000/api/memories
+x-user-id: 00000000-0000-4000-8000-000000000001
+
+
+
+### create a user 
+POST http://localhost:4000/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "test@ai.com",
+  "password": "test1234"
+}
+
+
+#### login
+POST http://localhost:4000/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "test@ai.com",
+  "password": "test1234"
+}
+
+#### list converstions
+GET http://localhost:4000/api/conversations 
+x-user-id: 00000000-0000-4000-8000-000000000001 
+
+
+
+
+####
+
+curl http://179.67.197.159:11434/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen3:4b",
+    "messages": [
+      {"role": "user", "content": "Introduce yourself as my AI Chief Assistant."}
+    ],
+    "stream": false
+  }'
+
+#####
+  curl http://179.67.197.159:11434/api/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "qwen3:4b-instruct",
+    "messages": [
+      {"role": "user", "content": "Introduce yourself as my AI Chief Assistant."}
+    ],
+    "think": false,
+    "stream": false
+  }'

@@ -1,0 +1,387 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// User
+// ============================================================================
+
+model User {
+  id                String   @id @default(uuid()) @db.Uuid
+  email             String? @unique
+  passwordHash      String?
+  firstName         String?
+  lastName          String?
+  displayName       String?
+  profileImageUrl   String?
+  bio               String?
+  timezone          String   @default("Africa/Nairobi")
+  preferredLanguage String   @default("en")
+  locationCountry   String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  preferences      UserPreferences?
+  assistantProfile AssistantProfile?
+  goals            Goal[]
+  tasks            Task[]
+  reminders        Reminder[]
+  memories         Memory[]
+  agentActions     AgentAction[]
+  conversations    Conversation[]
+
+  @@map("users")
+}
+
+// ============================================================================
+// User Preferences
+// ============================================================================
+
+enum DateFormat {
+  DMY
+  MDY
+  YMD
+}
+
+enum TimeFormat {
+  H12
+  H24
+}
+
+enum WeekStartDay {
+  SUNDAY
+  MONDAY
+}
+
+enum NotificationPreference {
+  ALL
+  IMPORTANT
+  NONE
+}
+
+model UserPreferences {
+  id                     String                 @id @default(uuid()) @db.Uuid
+  userId                 String                 @unique @db.Uuid
+  timezone               String                 @default("Africa/Nairobi")
+  preferredLanguage      String                 @default("en")
+  dateFormat             DateFormat             @default(DMY)
+  timeFormat             TimeFormat             @default(H24)
+  weekStartDay           WeekStartDay           @default(MONDAY)
+  notificationPreference NotificationPreference @default(ALL)
+  morningPlanningEnabled Boolean                @default(true)
+  morningPlanningTime    String                 @default("07:30")
+  eveningReviewEnabled   Boolean                @default(true)
+  eveningReviewTime      String                 @default("20:00")
+  createdAt              DateTime               @default(now())
+  updatedAt              DateTime               @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_preferences")
+}
+
+// ============================================================================
+// Assistant Profile
+// ============================================================================
+
+enum AssistantPersonality {
+  PROFESSIONAL
+  FRIENDLY
+  DIRECT
+  SUPPORTIVE
+  STRATEGIC
+}
+
+enum CommunicationStyle {
+  CONCISE
+  BALANCED
+  DETAILED
+}
+
+enum ResponseLength {
+  SHORT
+  BALANCED
+  LONG
+}
+
+enum ProactivityLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model AssistantProfile {
+  id                 String               @id @default(uuid()) @db.Uuid
+  userId             String               @unique @db.Uuid
+  name               String               @default("Chief")
+  personality        AssistantPersonality @default(FRIENDLY)
+  communicationStyle CommunicationStyle   @default(BALANCED)
+  responseLength     ResponseLength       @default(BALANCED)
+  proactivity        ProactivityLevel     @default(MEDIUM)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("assistant_profiles")
+}
+
+// ============================================================================
+// Goals
+// ============================================================================
+
+enum GoalCategory {
+  CAREER
+  BUSINESS
+  PERSONAL
+  LEARNING
+  FINANCIAL
+  HEALTH
+  OTHER
+}
+
+enum GoalPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum GoalStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+  CANCELLED
+}
+
+model Goal {
+  id          String       @id @default(uuid()) @db.Uuid
+  userId      String       @db.Uuid
+  title       String
+  description String?
+  category    GoalCategory @default(OTHER)
+  priority    GoalPriority @default(MEDIUM)
+  status      GoalStatus   @default(ACTIVE)
+  targetDate  DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@index([userId, targetDate])
+  @@map("goals")
+}
+
+// ============================================================================
+// Tasks
+// ============================================================================
+
+enum TaskPriority {
+  URGENT
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskSource {
+  USER
+  AI_CONVERSATION
+  MANUAL
+  INTEGRATION
+}
+
+model Task {
+  id          String       @id @default(uuid()) @db.Uuid
+  userId      String       @db.Uuid
+  title       String
+  description String?
+  priority    TaskPriority @default(MEDIUM)
+  status      TaskStatus   @default(TODO)
+  projectId   String?
+  dueDate     DateTime?
+  reminderAt  DateTime?
+  source      TaskSource   @default(USER)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminders Reminder[]
+
+  @@index([userId, status])
+  @@index([userId, dueDate])
+  @@index([userId, priority])
+  @@map("tasks")
+}
+
+// ============================================================================
+// Reminders
+// ============================================================================
+
+enum ReminderStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
+}
+
+model Reminder {
+  id          String         @id @default(uuid()) @db.Uuid
+  userId      String         @db.Uuid
+  taskId      String?        @db.Uuid
+  title       String
+  description String?
+  remindAt    DateTime
+  status      ReminderStatus @default(PENDING)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([userId, remindAt])
+  @@index([taskId])
+  @@map("reminders")
+}
+
+// ============================================================================
+// Memories
+// ============================================================================
+
+enum MemoryCategory {
+  PERSONAL
+  GOAL
+  PROJECT
+  PEOPLE
+  PREFERENCE
+  DECISION
+  IMPORTANT_CONTEXT
+}
+
+enum MemoryImportance {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum MemoryStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+enum MemorySource {
+  USER
+  AI
+  SYSTEM
+  IMPORTED
+}
+
+model Memory {
+  id                   String           @id @default(uuid()) @db.Uuid
+  userId               String           @db.Uuid
+  category             MemoryCategory
+  title                String
+  content              String
+  importance           MemoryImportance @default(MEDIUM)
+  status               MemoryStatus     @default(ACTIVE)
+  source               MemorySource     @default(USER)
+  confidence           Float            @default(1)
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+  lastAccessedAt       DateTime?
+  accessCount          Int              @default(0)
+  expiresAt            DateTime?
+  sourceConversationId String?          @db.Uuid
+  metadata             Json?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, category])
+  @@index([userId, importance])
+  @@index([createdAt])
+  @@index([lastAccessedAt])
+  @@map("memories")
+}
+
+// ============================================================================
+// Conversations
+// ============================================================================
+
+model Conversation {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ConversationMessage[]
+  actions  AgentAction[]
+
+  @@index([userId, updatedAt])
+  @@map("conversations")
+}
+
+model ConversationMessage {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @db.Uuid
+  role           String   // 'user' | 'assistant' | 'system'
+  content        String
+  metadata       Json?
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("conversation_messages")
+}
+
+// ============================================================================
+// Agent Actions (audit log)
+// ============================================================================
+
+enum AgentActionStatus {
+  SUCCESS
+  FAILED
+  REJECTED
+}
+
+model AgentAction {
+  id             String            @id @default(uuid()) @db.Uuid
+  userId         String            @db.Uuid
+  conversationId String?           @db.Uuid
+  actionType     String
+  toolName       String?
+  input          Json?
+  output         Json?
+  status         AgentActionStatus
+  createdAt      DateTime          @default(now())
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([userId, status])
+  @@index([conversationId])
+  @@map("agent_actions")
+}
